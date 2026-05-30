@@ -52,6 +52,7 @@ model FamilyEvent {
   persons        FamilyEventPerson[]
 
   @@unique([source, sourceCalendarId, externalId, recurrenceId])
+  @@index([externalId])
   @@index([startDateTime])
   @@index([sourceCalendarId])
 }

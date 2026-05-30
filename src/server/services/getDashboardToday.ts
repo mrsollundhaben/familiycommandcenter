@@ -1,5 +1,5 @@
 import { format, isSameDay } from "date-fns";
-import { toZonedTime } from "date-fns-tz";
+import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { prisma } from "@/server/db/prisma";
 import { env } from "@/server/config/env";
 import { findCurrent, findNext, minutesUntil } from "@/domain/events/grouping";
@@ -12,11 +12,13 @@ function personIdsFromLinks(links: Array<{ familyMemberId: string }>) {
 
 export async function getDashboardToday(date = new Date()): Promise<DashboardToday> {
   const zoned = toZonedTime(date, env.DEFAULT_TIMEZONE);
-  const start = new Date(zoned);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(zoned);
-  end.setDate(end.getDate() + env.SYNC_DAYS_AHEAD + 1);
-  end.setHours(23, 59, 59, 999);
+  const startWallTime = new Date(zoned);
+  startWallTime.setHours(0, 0, 0, 0);
+  const endWallTime = new Date(startWallTime);
+  endWallTime.setDate(startWallTime.getDate() + env.SYNC_DAYS_AHEAD);
+  endWallTime.setHours(23, 59, 59, 999);
+  const start = fromZonedTime(startWallTime, env.DEFAULT_TIMEZONE);
+  const end = fromZonedTime(endWallTime, env.DEFAULT_TIMEZONE);
 
   const [members, events, tasks, lastSync] = await Promise.all([
     prisma.familyMember.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } }),
