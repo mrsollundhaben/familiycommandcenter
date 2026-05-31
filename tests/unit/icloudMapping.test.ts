@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildICloudExternalId, normalizeICloudOccurrence } from "@/domain/events/icloudMapping";
-import { classifyICloudUpsert, getSyncCompletionStatus, hasICloudCredentials } from "@/server/services/syncICloudCalendars";
+import { classifyICloudUpsert, getSyncCompletionStatus, hasICloudCredentials } from "@/domain/events/icloudSyncLogic";
 
 const members = [
   { id: "mama", displayName: "Mama", shortName: "Mama" },

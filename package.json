@@ -16,7 +16,7 @@
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "latest",
+    "@prisma/client": "6.19.3",
     "clsx": "latest",
     "date-fns": "latest",
     "date-fns-tz": "latest",
@@ -40,7 +40,7 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "playwright": "latest",
-    "prisma": "latest",
+    "prisma": "6.19.3",
     "tailwindcss": "latest",
     "tsx": "latest",
     "typescript": "latest",

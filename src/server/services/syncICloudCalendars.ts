@@ -4,6 +4,7 @@ import { prisma } from "@/server/db/prisma";
 import { env } from "@/server/config/env";
 import { expandICalendarEvents } from "@/server/services/icalExpand";
 import { normalizeICloudOccurrence, type NormalizedICloudEvent } from "@/domain/events/icloudMapping";
+import { classifyICloudUpsert, getSyncCompletionStatus, hasICloudCredentials } from "@/domain/events/icloudSyncLogic";
 
 type DAVCalendarLike = {
   url: string;
@@ -30,10 +31,6 @@ type SyncError = {
   message: string;
   calendar?: string;
 };
-
-export function hasICloudCredentials(input: { username?: string; appPassword?: string }) {
-  return Boolean(input.username && input.appPassword);
-}
 
 function caldavBaseUrl() {
   return env.CALDAV_URL.endsWith("/") ? env.CALDAV_URL : `${env.CALDAV_URL}/`;
@@ -124,12 +121,6 @@ async function replaceEventPersons(eventId: string, personIds: string[]) {
   }
 }
 
-export function classifyICloudUpsert(existing: { rawHash: string | null; deletedAt: Date | null } | null, nextRawHash: string) {
-  if (!existing) return "created" as const;
-  if (existing.rawHash !== nextRawHash || existing.deletedAt) return "updated" as const;
-  return "unchanged" as const;
-}
-
 async function upsertICloudEvent(event: NormalizedICloudEvent, sourceCalendarId: string) {
   const existing = await prisma.familyEvent.findFirst({ where: { source: "icloud", externalId: event.externalId } });
   const eventData = {
@@ -187,10 +178,6 @@ async function markDeletedICloudEvents(input: { sourceCalendarIds: string[]; see
     data: { deletedAt: new Date() }
   });
   return staleEvents.length;
-}
-
-export function getSyncCompletionStatus(input: { errorCount: number; syncedCalendarCount: number }) {
-  return input.errorCount === 0 ? "success" : input.syncedCalendarCount > 0 ? "partial" : "failed";
 }
 
 async function finishSyncLog(input: { logId: string; counters: SyncCounters; errors: SyncError[]; syncedCalendarIds: string[] }) {

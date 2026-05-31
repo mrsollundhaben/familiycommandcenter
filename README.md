@@ -87,3 +87,49 @@ http://localhost:3000/dashboard
 ```
 
 Der Sync legt beim ersten Lauf gefundene iCloud-Kalender als `CalendarSource`-Einträge an. Sind bereits aktivierte Kalenderquellen vorhanden, werden nur diese synchronisiert. Kalendertermine werden read-only gelesen, in `FamilyEvent` normalisiert und über eine stabile `externalId` dedupliziert. Lokale Aufgaben und lokale Events werden dabei nicht gelöscht.
+
+## Prisma-Version
+
+Dieses Projekt verwendet bewusst **Prisma 6.19.3** und pinnt sowohl `prisma` als auch `@prisma/client` exakt auf diese Version. Bitte nicht auf Prisma 7 upgraden, solange `prisma/schema.prisma` noch das klassische Prisma-6-Datasource-Format mit `url = env("DATABASE_URL")` nutzt.
+
+Falls Prisma versehentlich auf Version 7 aktualisiert wurde oder Fehler zur Datasource-URL auftreten, zurück auf Prisma 6 pinnen und den Client neu generieren:
+
+```bash
+npm install prisma@6.19.3 @prisma/client@6.19.3
+npx prisma generate
+```
+
+## Lokaler Test nach iCloud-Sync-Fix
+
+```bash
+cd <project>
+cp .env.example .env
+# .env bearbeiten und iCloud App-spezifisches Passwort eintragen
+npm install
+npx prisma generate
+npm run db:push
+npm run db:seed
+npm run dev
+```
+
+Admin Login und Sync per curl:
+
+```bash
+curl -i -c cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"pin":"123456"}' \
+  http://localhost:3000/api/admin/login
+
+curl -i -b cookies.txt -X POST \
+  http://localhost:3000/api/admin/sync/icloud
+
+curl -i -b cookies.txt \
+  http://localhost:3000/api/admin/sync/status
+```
+
+Erwartung:
+
+- Kein Fehler `options.exceptions.forEach is not a function`.
+- Status idealerweise `success`, oder `partial` nur bei echten nicht-parsbaren Einzelereignissen.
+- `eventsFetched > 0`, wenn iCloud-Termine im Zeitraum vorhanden sind.
+- Das Dashboard zeigt importierte Termine unter `/dashboard/today`.
