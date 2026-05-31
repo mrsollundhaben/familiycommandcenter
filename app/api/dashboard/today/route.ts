@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import "@/server/services/syncBootstrap";
 import { getDashboardToday } from "@/server/services/getDashboardToday";
 import { bootstrapSyncScheduler } from "@/server/services/syncBootstrap";
 
