@@ -68,6 +68,7 @@ describe("iCloud event mapping", () => {
     expect(hasICloudCredentials({ username: "user@example.com", appPassword: "app-pass" })).toBe(true);
     expect(hasICloudCredentials({ username: "user@example.com" })).toBe(false);
     expect(hasICloudCredentials({ appPassword: "app-pass" })).toBe(false);
+    expect(hasICloudCredentials({ username: "   ", appPassword: "app-pass" })).toBe(false);
   });
 
   it("classifies upsert decisions", () => {

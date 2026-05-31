@@ -9,7 +9,8 @@ import { FamilyMemberBar } from "@/components/dashboard/FamilyMemberBar";
 import { findCurrent, findNext, minutesUntil } from "@/domain/events/grouping";
 import type { DashboardItem, DashboardToday } from "@/domain/events/types";
 
-const DASHBOARD_REFRESH_MS = 45_000;
+const DASHBOARD_REFRESH_MS = 15_000;
+const DASHBOARD_SYNC_RUNNING_REFRESH_MS = 3_000;
 const CLOCK_REFRESH_MS = 1_000;
 
 function currentTime() {
@@ -17,8 +18,9 @@ function currentTime() {
 }
 
 async function fetchDashboardToday(signal?: AbortSignal) {
-  const response = await fetch("/api/dashboard/today", {
+  const response = await fetch(`/api/dashboard/today?ts=${Date.now()}`, {
     cache: "no-store",
+    headers: { "Cache-Control": "no-cache" },
     signal
   });
 
@@ -112,8 +114,23 @@ export function LiveDashboard({ syncDaysAhead }: { syncDaysAhead: number }) {
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => void refresh(), DASHBOARD_REFRESH_MS);
+    const refreshMs = data?.sync.status === "running" ? DASHBOARD_SYNC_RUNNING_REFRESH_MS : DASHBOARD_REFRESH_MS;
+    const timer = window.setInterval(() => void refresh(), refreshMs);
     return () => window.clearInterval(timer);
+  }, [data?.sync.status, refresh]);
+
+  useEffect(() => {
+    const refreshVisibleDashboard = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+
+    document.addEventListener("visibilitychange", refreshVisibleDashboard);
+    window.addEventListener("focus", refreshVisibleDashboard);
+
+    return () => {
+      document.removeEventListener("visibilitychange", refreshVisibleDashboard);
+      window.removeEventListener("focus", refreshVisibleDashboard);
+    };
   }, [refresh]);
 
   const liveItems = useMemo(() => data?.sections.later ?? [], [data]);

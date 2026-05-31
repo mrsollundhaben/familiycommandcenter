@@ -1,7 +1,7 @@
 import { createDAVClient } from "tsdav";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { prisma } from "@/server/db/prisma";
-import { env } from "@/server/config/env";
+import { getEnv } from "@/server/config/env";
 import { expandICalendarEvents } from "@/server/services/icalExpand";
 import { normalizeICloudOccurrence, type NormalizedICloudEvent } from "@/domain/events/icloudMapping";
 import { classifyICloudUpsert, getSyncCompletionStatus, hasICloudCredentials } from "@/domain/events/icloudSyncLogic";
@@ -32,21 +32,27 @@ type SyncError = {
   calendar?: string;
 };
 
-function caldavBaseUrl() {
-  return env.CALDAV_URL.endsWith("/") ? env.CALDAV_URL : `${env.CALDAV_URL}/`;
+function caldavBaseUrl(caldavUrl: string) {
+  return caldavUrl.endsWith("/") ? caldavUrl : `${caldavUrl}/`;
 }
 
-function syncWindow(now = new Date()) {
-  const zonedNow = toZonedTime(now, env.DEFAULT_TIMEZONE);
+type SyncWindowInput = Date | { timezone: string; daysAhead: number; now?: Date };
+
+function syncWindow(input: SyncWindowInput = new Date()) {
+  const runtimeEnv = getEnv();
+  const timezone = input instanceof Date ? runtimeEnv.DEFAULT_TIMEZONE : input.timezone;
+  const daysAhead = input instanceof Date ? runtimeEnv.SYNC_DAYS_AHEAD : input.daysAhead;
+  const now = input instanceof Date ? input : input.now ?? new Date();
+  const zonedNow = toZonedTime(now, timezone);
   const startWallTime = new Date(zonedNow);
   startWallTime.setHours(0, 0, 0, 0);
   const endWallTime = new Date(startWallTime);
-  endWallTime.setDate(startWallTime.getDate() + env.SYNC_DAYS_AHEAD);
+  endWallTime.setDate(startWallTime.getDate() + daysAhead);
   endWallTime.setHours(23, 59, 59, 999);
 
   return {
-    start: fromZonedTime(startWallTime, env.DEFAULT_TIMEZONE),
-    end: fromZonedTime(endWallTime, env.DEFAULT_TIMEZONE)
+    start: fromZonedTime(startWallTime, timezone),
+    end: fromZonedTime(endWallTime, timezone)
   };
 }
 
@@ -58,12 +64,12 @@ function supportsEvents(calendar: DAVCalendarLike) {
   return !calendar.components?.length || calendar.components.includes("VEVENT");
 }
 
-async function fetchRemoteCalendars() {
+async function fetchRemoteCalendars(input: { caldavUrl: string; username: string; appPassword: string }) {
   const client = await createDAVClient({
-    serverUrl: caldavBaseUrl(),
+    serverUrl: caldavBaseUrl(input.caldavUrl),
     credentials: {
-      username: env.ICLOUD_USERNAME!,
-      password: env.ICLOUD_APP_PASSWORD!
+      username: input.username,
+      password: input.appPassword
     },
     authMethod: "Basic",
     defaultAccountType: "caldav"
@@ -204,6 +210,16 @@ async function finishSyncLog(input: { logId: string; counters: SyncCounters; err
 }
 
 export async function syncICloudCalendars() {
+  const runtimeEnv = getEnv();
+  const runningLog = await prisma.syncLog.findFirst({
+    where: { status: "running", finishedAt: null },
+    orderBy: { startedAt: "desc" }
+  });
+  if (runningLog) {
+    console.log(`iCloud sync skipped; sync already running since ${runningLog.startedAt.toISOString()}`);
+    return runningLog;
+  }
+
   console.log("iCloud sync started");
   const log = await prisma.syncLog.create({ data: { status: "running", message: "iCloud sync started" } });
   const counters: SyncCounters = { eventsFetched: 0, eventsCreated: 0, eventsUpdated: 0, eventsDeleted: 0 };
@@ -211,7 +227,7 @@ export async function syncICloudCalendars() {
   const seenExternalIds = new Set<string>();
   const syncedCalendarIds: string[] = [];
 
-  if (!hasICloudCredentials({ username: env.ICLOUD_USERNAME, appPassword: env.ICLOUD_APP_PASSWORD })) {
+  if (!hasICloudCredentials({ username: runtimeEnv.ICLOUD_USERNAME, appPassword: runtimeEnv.ICLOUD_APP_PASSWORD })) {
     console.log("iCloud sync failed: missing credentials");
     return prisma.syncLog.update({
       where: { id: log.id },
@@ -224,9 +240,11 @@ export async function syncICloudCalendars() {
     });
   }
 
-  const { start, end } = syncWindow();
+  const username = runtimeEnv.ICLOUD_USERNAME!.trim();
+  const appPassword = runtimeEnv.ICLOUD_APP_PASSWORD!.trim();
+  const { start, end } = syncWindow({ timezone: runtimeEnv.DEFAULT_TIMEZONE, daysAhead: runtimeEnv.SYNC_DAYS_AHEAD });
   try {
-    const { client, calendars } = await fetchRemoteCalendars();
+    const { client, calendars } = await fetchRemoteCalendars({ caldavUrl: runtimeEnv.CALDAV_URL, username, appPassword });
     console.log(`iCloud calendars found: ${calendars.length}`);
     const sourcesToSync = await ensureCalendarSources(calendars);
     const familyMembers = await prisma.familyMember.findMany({ where: { isActive: true } });
