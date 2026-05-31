@@ -92,7 +92,7 @@ Der Sync legt beim ersten Lauf gefundene iCloud-Kalender als `CalendarSource`-Ei
 
 ## Periodischer serverseitiger iCloud-Sync
 
-Zusätzlich zum manuellen Admin-Endpunkt startet die App in der lokalen Next.js-Node-Runtime einen einfachen `node-cron`-Scheduler. Der Bootstrap wird serverseitig über die Dashboard-API geladen und nutzt einen Singleton auf `globalThis`, damit Hot Reloads oder mehrere Imports den Cron nicht mehrfach starten.
+Zusätzlich zum manuellen Admin-Endpunkt startet die App in der lokalen Next.js-Node-Runtime einen einfachen `node-cron`-Scheduler. Der Bootstrap wird serverseitig beim Aufruf der Dashboard-API gestartet und nutzt einen Singleton auf `globalThis`, damit Hot Reloads oder mehrere Requests den Cron nicht mehrfach starten.
 
 Konfiguration:
 
@@ -105,6 +105,8 @@ SYNC_CRON=*/10 * * * *
 ```
 
 Der Scheduler ruft intern `syncICloudCalendars()` auf und schreibt keine Daten zu iCloud zurück. Vor jedem Lauf wird geprüft, ob bereits ein `SyncLog` mit `status = "running"` und leerem `finishedAt` existiert; in diesem Fall wird der neue Lauf übersprungen. Zugangsdaten werden ausschließlich aus Environment Variables gelesen und nicht geloggt.
+
+Hinweis: Der periodische Sync liest die iCloud-Credentials bei jedem Lauf frisch aus `process.env`. So verwendet der Cron dieselben Runtime-Environment-Werte wie der manuell gestartete Admin-Sync; die Werte selbst werden nicht geloggt.
 
 ## Prisma-Version
 

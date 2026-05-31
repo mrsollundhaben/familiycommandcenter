@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { prisma } from "@/server/db/prisma";
-import { env } from "@/server/config/env";
+import { getEnv } from "@/server/config/env";
 import { syncICloudCalendars } from "@/server/services/syncICloudCalendars";
 
 const DEFAULT_SYNC_INTERVAL_MINUTES = 10;
@@ -32,7 +32,8 @@ function intervalExpression(minutes: number) {
 }
 
 export function configuredSyncCronExpression() {
-  return env.SYNC_CRON?.trim() || intervalExpression(env.SYNC_INTERVAL_MINUTES ?? DEFAULT_SYNC_INTERVAL_MINUTES);
+  const runtimeEnv = getEnv();
+  return runtimeEnv.SYNC_CRON?.trim() || intervalExpression(runtimeEnv.SYNC_INTERVAL_MINUTES ?? DEFAULT_SYNC_INTERVAL_MINUTES);
 }
 
 function shouldStartScheduler() {

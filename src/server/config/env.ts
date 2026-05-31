@@ -13,7 +13,11 @@ const envSchema = z.object({
   SYNC_INTERVAL_MINUTES: z.coerce.number().int().min(1).max(59).default(10)
 });
 
-export const env = envSchema.parse(process.env);
+export function getEnv() {
+  return envSchema.parse(process.env);
+}
+
+export const env = getEnv();
 
 export function requireAdminPin() {
   if (!env.ADMIN_PIN) {

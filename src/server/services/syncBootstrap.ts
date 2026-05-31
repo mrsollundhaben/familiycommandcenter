@@ -1,3 +1,5 @@
 import { startSyncScheduler } from "@/server/services/syncScheduler";
 
-startSyncScheduler();
+export function bootstrapSyncScheduler() {
+  return startSyncScheduler();
+}
