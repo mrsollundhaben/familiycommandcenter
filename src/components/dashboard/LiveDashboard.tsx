@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 import { RefreshCw } from "lucide-react";
+import { SyncStatusBadge } from "@/components/dashboard/SyncStatusBadge";
 import { EventCard } from "@/components/dashboard/EventCard";
 import { FamilyMemberBar } from "@/components/dashboard/FamilyMemberBar";
 import { findCurrent, findNext, minutesUntil } from "@/domain/events/grouping";
@@ -31,21 +32,20 @@ async function fetchDashboardToday(signal?: AbortSignal) {
   return response.json() as Promise<DashboardToday>;
 }
 
-function SyncNotice({ data, lastUpdatedAt, error }: { data: DashboardToday | null; lastUpdatedAt: Date | null; error: string | null }) {
+function SyncNotice({ data, lastUpdatedAt, error, now }: { data: DashboardToday | null; lastUpdatedAt: Date | null; error: string | null; now: Date }) {
   if (!data && !error) {
     return <p className="text-sm text-slate-500">Lade Dashboard…</p>;
   }
 
   return (
     <div className="flex flex-col items-end gap-1 text-sm text-slate-500">
-      <p>Sync: {data?.sync.status ?? "noch nie"}</p>
-      {lastUpdatedAt ? <p>Aktualisiert: {format(lastUpdatedAt, "HH:mm:ss", { locale: de })}</p> : null}
+      {data ? <SyncStatusBadge sync={data.sync} now={now} /> : null}
+      {lastUpdatedAt ? <p>Dashboard aktualisiert: {format(lastUpdatedAt, "HH:mm:ss", { locale: de })}</p> : null}
       {error ? (
         <p className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 font-semibold text-amber-900">
           <RefreshCw className="h-4 w-4" /> Nutze alte Daten · {error}
         </p>
       ) : null}
-      {data?.sync.isStale ? <p className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">Server-Sync ist älter als 30 Min.</p> : null}
     </div>
   );
 }
@@ -158,7 +158,7 @@ export function LiveDashboard({ syncDaysAhead }: { syncDaysAhead: number }) {
           </div>
           <div className="text-right">
             <p className="text-6xl font-black tabular-nums">{format(now, "HH:mm")}</p>
-            <SyncNotice data={data} lastUpdatedAt={lastUpdatedAt} error={error} />
+            <SyncNotice data={data} lastUpdatedAt={lastUpdatedAt} error={error} now={now} />
           </div>
         </div>
       </header>
