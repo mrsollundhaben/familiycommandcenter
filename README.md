@@ -40,6 +40,8 @@ ADMIN_PIN=123456
 SESSION_SECRET=ein-langer-zufaelliger-session-secret
 DEFAULT_TIMEZONE=Europe/Vienna
 SYNC_DAYS_AHEAD=3
+SYNC_INTERVAL_MINUTES=10
+# alternativ: SYNC_CRON=*/10 * * * *
 ```
 
 Für iCloud muss ein app-spezifisches Passwort verwendet werden. Das normale Apple-ID-Hauptpasswort darf nicht in die `.env`.
@@ -87,6 +89,24 @@ http://localhost:3000/dashboard
 ```
 
 Der Sync legt beim ersten Lauf gefundene iCloud-Kalender als `CalendarSource`-Einträge an. Sind bereits aktivierte Kalenderquellen vorhanden, werden nur diese synchronisiert. Kalendertermine werden read-only gelesen, in `FamilyEvent` normalisiert und über eine stabile `externalId` dedupliziert. Lokale Aufgaben und lokale Events werden dabei nicht gelöscht.
+
+## Periodischer serverseitiger iCloud-Sync
+
+Zusätzlich zum manuellen Admin-Endpunkt startet die App in der lokalen Next.js-Node-Runtime einen einfachen `node-cron`-Scheduler. Der Bootstrap wird serverseitig beim Aufruf der Dashboard-API gestartet und nutzt einen Singleton auf `globalThis`, damit Hot Reloads oder mehrere Requests den Cron nicht mehrfach starten.
+
+Konfiguration:
+
+```env
+# Standard: alle 10 Minuten
+SYNC_INTERVAL_MINUTES=10
+
+# Optionaler Override mit node-cron-Ausdruck, z. B. alle 10 Minuten
+SYNC_CRON=*/10 * * * *
+```
+
+Der Scheduler ruft intern `syncICloudCalendars()` auf und schreibt keine Daten zu iCloud zurück. Vor jedem Lauf wird geprüft, ob bereits ein `SyncLog` mit `status = "running"` und leerem `finishedAt` existiert; in diesem Fall wird der neue Lauf übersprungen. Zugangsdaten werden ausschließlich aus Environment Variables gelesen und nicht geloggt.
+
+Hinweis: Der periodische Sync liest die iCloud-Credentials bei jedem Lauf frisch aus `process.env`. So verwendet der Cron dieselben Runtime-Environment-Werte wie der manuell gestartete Admin-Sync; die Werte selbst werden nicht geloggt.
 
 ## Prisma-Version
 

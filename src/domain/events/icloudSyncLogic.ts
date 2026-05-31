@@ -1,5 +1,5 @@
 export function hasICloudCredentials(input: { username?: string; appPassword?: string }) {
-  return Boolean(input.username && input.appPassword);
+  return Boolean(input.username?.trim() && input.appPassword?.trim());
 }
 
 export function classifyICloudUpsert(existing: { rawHash: string | null; deletedAt: Date | null } | null, nextRawHash: string) {
