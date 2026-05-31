@@ -137,6 +137,9 @@ export function LiveDashboard({ syncDaysAhead }: { syncDaysAhead: number }) {
   const current = useMemo(() => findCurrent(liveItems, now), [liveItems, now]);
   const next = useMemo(() => nextWithCountdown(findNext(liveItems, now), now), [liveItems, now]);
   const allItems = useMemo(() => (data ? [...data.sections.allDay, ...data.sections.later, ...data.sections.tasks] : []), [data]);
+  const refetchDashboardAfterTaskDone = useCallback(async () => {
+    await refresh();
+  }, [refresh]);
 
   if (!data && !isInitialLoadDone) {
     return <DashboardLoading />;
@@ -166,14 +169,14 @@ export function LiveDashboard({ syncDaysAhead }: { syncDaysAhead: number }) {
       <section className="mb-6 grid gap-6 lg:grid-cols-2">
         <div className="rounded-[2rem] bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-3xl font-black">Jetzt</h2>
-          {current ? <EventCard item={current} people={data.familyMembers} /> : <div className="rounded-3xl bg-sky-50 p-8 text-5xl font-black text-sky-950">Gerade frei 🧘</div>}
+          {current ? <EventCard item={current} people={data.familyMembers} onDoneChanged={refetchDashboardAfterTaskDone} /> : <div className="rounded-3xl bg-sky-50 p-8 text-5xl font-black text-sky-950">Gerade frei 🧘</div>}
         </div>
         <div className="rounded-[2rem] bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-3xl font-black">Als Nächstes</h2>
           {next ? (
             <div className="grid gap-4">
               <div className="rounded-3xl bg-indigo-50 p-5 text-3xl font-black text-indigo-950">Noch {next.countdownMinutes} Minuten</div>
-              <EventCard item={next} people={data.familyMembers} />
+              <EventCard item={next} people={data.familyMembers} onDoneChanged={refetchDashboardAfterTaskDone} />
             </div>
           ) : (
             <div className="rounded-3xl bg-emerald-50 p-8 text-5xl font-black text-emerald-950">Heute nichts Fixes mehr 🎉</div>
@@ -183,13 +186,13 @@ export function LiveDashboard({ syncDaysAhead }: { syncDaysAhead: number }) {
 
       <section className="mb-6 grid gap-4">
         <h2 className="text-4xl font-black">Tagesliste</h2>
-        {data.sections.allDay.map((item) => <EventCard key={item.id} item={item} people={data.familyMembers} />)}
-        {data.sections.later.map((item) => <EventCard key={item.id} item={item} people={data.familyMembers} />)}
+        {data.sections.allDay.map((item) => <EventCard key={item.id} item={item} people={data.familyMembers} onDoneChanged={refetchDashboardAfterTaskDone} />)}
+        {data.sections.later.map((item) => <EventCard key={item.id} item={item} people={data.familyMembers} onDoneChanged={refetchDashboardAfterTaskDone} />)}
       </section>
 
       <section className="mb-6 grid gap-4">
         <h2 className="text-4xl font-black">Aufgaben</h2>
-        {data.sections.tasks.length ? data.sections.tasks.map((item) => <EventCard key={item.id} item={item} people={data.familyMembers} />) : <p className="rounded-3xl bg-white p-6 text-3xl font-black">Keine offenen Aufgaben.</p>}
+        {data.sections.tasks.length ? data.sections.tasks.map((item) => <EventCard key={item.id} item={item} people={data.familyMembers} onDoneChanged={refetchDashboardAfterTaskDone} />) : <p className="rounded-3xl bg-white p-6 text-3xl font-black">Keine offenen Aufgaben.</p>}
       </section>
 
       <FamilyMemberBar people={data.familyMembers} items={allItems} />

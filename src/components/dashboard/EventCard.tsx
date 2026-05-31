@@ -22,7 +22,13 @@ function timeLabel(item: DashboardItem) {
   return format(new Date(item.startDateTime), "HH:mm", { locale: de });
 }
 
-export function EventCard({ item, people }: { item: DashboardItem; people: DashboardPerson[] }) {
+type EventCardProps = {
+  item: DashboardItem;
+  people: DashboardPerson[];
+  onDoneChanged?: (isDone: boolean, taskId: string) => Promise<void> | void;
+};
+
+export function EventCard({ item, people, onDoneChanged }: EventCardProps) {
   const assigned = people.filter((person) => item.personIds.includes(person.id));
   return (
     <article className={`rounded-3xl border-4 p-5 shadow-sm ${rigidityStyles[item.rigidity]} ${item.isDone ? "opacity-60" : ""}`}>
@@ -45,7 +51,7 @@ export function EventCard({ item, people }: { item: DashboardItem; people: Dashb
         ))}
       </div>
 
-      {item.kind === "task" ? <TaskDoneButton taskId={item.id} isDone={item.isDone} /> : null}
+      {item.kind === "task" ? <TaskDoneButton taskId={item.id} isDone={item.isDone} onDoneChanged={onDoneChanged} /> : null}
 
       {(item.preparationNotes || item.location) && (
         <div className="mt-4 grid gap-2 text-xl font-semibold">
