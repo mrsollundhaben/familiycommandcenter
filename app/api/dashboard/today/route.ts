@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import "@/server/services/syncBootstrap";
 import { getDashboardToday } from "@/server/services/getDashboardToday";
 
 export async function GET(request: Request) {

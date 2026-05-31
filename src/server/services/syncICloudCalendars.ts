@@ -204,6 +204,15 @@ async function finishSyncLog(input: { logId: string; counters: SyncCounters; err
 }
 
 export async function syncICloudCalendars() {
+  const runningLog = await prisma.syncLog.findFirst({
+    where: { status: "running", finishedAt: null },
+    orderBy: { startedAt: "desc" }
+  });
+  if (runningLog) {
+    console.log(`iCloud sync skipped; sync already running since ${runningLog.startedAt.toISOString()}`);
+    return runningLog;
+  }
+
   console.log("iCloud sync started");
   const log = await prisma.syncLog.create({ data: { status: "running", message: "iCloud sync started" } });
   const counters: SyncCounters = { eventsFetched: 0, eventsCreated: 0, eventsUpdated: 0, eventsDeleted: 0 };
