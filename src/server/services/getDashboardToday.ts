@@ -24,7 +24,14 @@ export async function getDashboardToday(date = new Date()): Promise<DashboardTod
   const [members, events, tasks, lastSync] = await Promise.all([
     prisma.familyMember.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } }),
     prisma.familyEvent.findMany({
-      where: { deletedAt: null, startDateTime: { gte: start, lte: end } },
+      where: {
+        deletedAt: null,
+        startDateTime: { gte: start, lte: end },
+        OR: [
+          { calendarSource: null },
+          { calendarSource: { includeInDashboard: true } }
+        ]
+      },
       include: { persons: true },
       orderBy: { startDateTime: "asc" }
     }),
