@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model FamilyMember {
+  id          String   @id @default(cuid())
+  displayName String
+  shortName   String
+  role        String
+  color       String
+  icon        String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  eventLinks FamilyEventPerson[]
+  taskLinks  TaskPerson[]
+}
+
+model FamilyEvent {
+  id               String        @id @default(cuid())
+  externalId       String?
+  recurrenceId     String?
+  source           String
+  sourceCalendarId String?
+  title            String
+  originalTitle    String?
+  description      String?
+  location         String?
+  startDateTime    DateTime
+  endDateTime      DateTime?
+  isAllDay         Boolean       @default(false)
+  rigidity         String
+  category         String
+  importance       String    @default("normal")
+  checklist        Json?
+  preparationNotes String?
+  isDone           Boolean       @default(false)
+  doneAt           DateTime?
+  rawHash          String?
+  deletedAt        DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  calendarSource CalendarSource?     @relation(fields: [sourceCalendarId], references: [id])
+  persons        FamilyEventPerson[]
+
+  @@unique([source, sourceCalendarId, externalId, recurrenceId])
+  @@index([externalId])
+  @@index([startDateTime])
+  @@index([sourceCalendarId])
+}
+
+model Task {
+  id         String      @id @default(cuid())
+  title      String
+  dueDate    DateTime?
+  dueTime    String?
+  rigidity   String    @default("flexible")
+  recurrence Json?
+  isDone     Boolean     @default(false)
+  doneAt     DateTime?
+  source     String @default("local")
+  sortOrder  Int         @default(0)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  persons TaskPerson[]
+}
+
+model CalendarSource {
+  id                 String        @id @default(cuid())
+  name               String
+  caldavUrl          String?
+  calendarName       String
+  calendarColor      String?
+  enabled            Boolean       @default(true)
+  defaultRigidity    String      @default("flexible")
+  defaultCategory    String @default("appointment")
+  defaultPersonIds   Json?
+  includeInDashboard Boolean       @default(true)
+  lastSyncAt         DateTime?
+  lastSyncStatus     String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  events FamilyEvent[]
+}
+
+model SyncLog {
+  id            String     @id @default(cuid())
+  startedAt     DateTime   @default(now())
+  finishedAt    DateTime?
+  status        String
+  message       String?
+  eventsFetched Int        @default(0)
+  eventsCreated Int        @default(0)
+  eventsUpdated Int        @default(0)
+  eventsDeleted Int        @default(0)
+  errors        Json?
+}
+
+model FamilyEventPerson {
+  familyEventId  String
+  familyMemberId String
+
+  familyEvent  FamilyEvent  @relation(fields: [familyEventId], references: [id], onDelete: Cascade)
+  familyMember FamilyMember @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
+
+  @@id([familyEventId, familyMemberId])
+}
+
+model TaskPerson {
+  taskId         String
+  familyMemberId String
+
+  task         Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  familyMember FamilyMember @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, familyMemberId])
+}
