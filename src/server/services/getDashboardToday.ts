@@ -3,6 +3,7 @@ import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { prisma } from "@/server/db/prisma";
 import { env } from "@/server/config/env";
 import { findCurrent, findNext, groupDashboardDays, localDateKey, minutesUntil } from "@/domain/events/grouping";
+import { buildPreparationHints } from "@/domain/events/preparation";
 import type { DashboardItem, DashboardToday } from "@/domain/events/types";
 import type { EventCategory, Importance, Rigidity } from "@/domain/events/valueTypes";
 
@@ -39,21 +40,36 @@ export async function getDashboardToday(date = new Date()): Promise<DashboardTod
     prisma.syncLog.findFirst({ orderBy: { startedAt: "desc" } })
   ]);
 
-  const eventItems: DashboardItem[] = events.map((event) => ({
-    id: event.id,
-    kind: "event",
-    title: event.title,
-    startDateTime: event.startDateTime.toISOString(),
-    endDateTime: event.endDateTime?.toISOString() ?? null,
-    isAllDay: event.isAllDay,
-    personIds: personIdsFromLinks(event.persons),
-    rigidity: event.rigidity as Rigidity,
-    category: event.category as EventCategory,
-    importance: event.importance as Importance,
-    preparationNotes: event.preparationNotes,
-    location: event.location,
-    isDone: event.isDone
-  }));
+  const eventItems: DashboardItem[] = events.map((event) => {
+    const preparationHints = buildPreparationHints(
+      {
+        startDateTime: event.startDateTime,
+        isAllDay: event.isAllDay,
+        location: event.location,
+        preparationNotes: event.preparationNotes
+      },
+      date
+    );
+
+    return {
+      id: event.id,
+      kind: "event",
+      title: event.title,
+      startDateTime: event.startDateTime.toISOString(),
+      endDateTime: event.endDateTime?.toISOString() ?? null,
+      isAllDay: event.isAllDay,
+      personIds: personIdsFromLinks(event.persons),
+      rigidity: event.rigidity as Rigidity,
+      category: event.category as EventCategory,
+      importance: event.importance as Importance,
+      preparationNotes: event.preparationNotes,
+      leaveAt: preparationHints?.leaveAt ?? null,
+      prepareAt: preparationHints?.prepareAt ?? null,
+      preparationChecklist: preparationHints?.preparationChecklist,
+      location: event.location,
+      isDone: event.isDone
+    };
+  });
 
   const taskItems: DashboardItem[] = tasks
     .filter((task) => !task.dueDate || localDateKey(task.dueDate, env.DEFAULT_TIMEZONE) === format(zoned, "yyyy-MM-dd"))

@@ -43,7 +43,7 @@ describe("iCloud event mapping", () => {
     expect(event.category).toBe("appointment");
     expect(event.importance).toBe("important");
     expect(event.personIds).toEqual(["k1"]);
-    expect(event.preparationNotes).toBe("Packen / vorbereiten");
+    expect(event.preparationNotes).toBe("Tasche packen");
     expect(event.rawHash).toHaveLength(64);
   });
 
