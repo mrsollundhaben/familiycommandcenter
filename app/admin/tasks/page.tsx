@@ -3,6 +3,7 @@ import { prisma } from "@/server/db/prisma";
 import { isAdminAuthenticated } from "@/server/auth/adminSession";
 import { AdminBackLink } from "@/components/admin/AdminBackLink";
 import { TaskAdminEditor } from "@/components/admin/TaskAdminEditor";
+import { parseTaskRecurrence } from "@/domain/tasks/recurrence";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,7 @@ export default async function TasksPage() {
           dueDate: task.dueDate?.toISOString() ?? null,
           dueTime: task.dueTime,
           rigidity: task.rigidity,
+          recurrence: parseTaskRecurrence(task.recurrence),
           sortOrder: task.sortOrder,
           isDone: task.isDone,
           persons: task.persons

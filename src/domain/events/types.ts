@@ -15,6 +15,7 @@ export type DashboardItem = {
   startDateTime?: string;
   endDateTime?: string | null;
   dueDateTime?: string | null;
+  completionDate?: string;
   isAllDay?: boolean;
   personIds: string[];
   rigidity: Rigidity;

@@ -4,12 +4,14 @@ import { z } from "zod";
 import { prisma } from "@/server/db/prisma";
 import { isAdminAuthenticated } from "@/server/auth/adminSession";
 import { apiError } from "@/lib/errors";
+import { taskRecurrenceSchema } from "@/domain/tasks/recurrence";
 
 const taskCreateSchema = z.object({
   title: z.string().trim().min(1),
   rigidity: z.enum(["fixed", "flexible", "optional"]).default("flexible"),
   dueDate: z.string().date().nullable().optional(),
   dueTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Expected HH:mm").nullable().optional(),
+  recurrence: taskRecurrenceSchema.nullable().optional(),
   personIds: z.array(z.string().min(1)).default([]),
   sortOrder: z.number().int().default(0),
   isDone: z.boolean().default(false)
@@ -49,12 +51,13 @@ export async function POST(request: Request) {
     return apiError("VALIDATION_ERROR", "Task contains inactive or unknown family members", 400, { personIds: validatedPersonIds.invalidIds });
   }
 
-  const { title, rigidity, dueDate, dueTime, sortOrder, isDone } = body.data;
+  const { title, rigidity, dueDate, dueTime, recurrence, sortOrder, isDone } = body.data;
   const task = await prisma.task.create({
     data: {
       title,
       rigidity,
       dueTime,
+      recurrence: recurrence ?? null,
       sortOrder,
       isDone,
       doneAt: isDone ? new Date() : null,
