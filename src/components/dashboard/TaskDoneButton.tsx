@@ -6,10 +6,11 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 type TaskDoneButtonProps = {
   taskId: string;
   isDone: boolean;
+  completionDate?: string;
   onDoneChanged?: (isDone: boolean, taskId: string) => Promise<void> | void;
 };
 
-export function TaskDoneButton({ taskId, isDone, onDoneChanged }: TaskDoneButtonProps) {
+export function TaskDoneButton({ taskId, isDone, completionDate, onDoneChanged }: TaskDoneButtonProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,7 +23,7 @@ export function TaskDoneButton({ taskId, isDone, onDoneChanged }: TaskDoneButton
       const response = await fetch(`/api/tasks/${taskId}/done`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isDone: nextDoneState })
+        body: JSON.stringify({ isDone: nextDoneState, date: completionDate })
       });
 
       if (!response.ok) {

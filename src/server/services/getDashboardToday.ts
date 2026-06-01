@@ -3,6 +3,7 @@ import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { prisma } from "@/server/db/prisma";
 import { env } from "@/server/config/env";
 import { findCurrent, findNext, groupDashboardDays, localDateKey, minutesUntil } from "@/domain/events/grouping";
+import { isRecurringTaskDueOnDate, parseTaskRecurrence } from "@/domain/tasks/recurrence";
 import { buildPreparationHints } from "@/domain/events/preparation";
 import type { DashboardItem, DashboardToday } from "@/domain/events/types";
 import type { EventCategory, Importance, Rigidity } from "@/domain/events/valueTypes";
@@ -14,10 +15,18 @@ function personIdsFromLinks(links: Array<{ familyMemberId: string }>) {
 function taskDueDateTimeIso(task: { dueDate: Date | null; dueTime: string | null }) {
   if (!task.dueDate) return null;
 
-  if (!task.dueTime) return task.dueDate.toISOString();
-
   const dateKey = localDateKey(task.dueDate, env.DEFAULT_TIMEZONE);
-  return fromZonedTime(`${dateKey}T${task.dueTime}:00`, env.DEFAULT_TIMEZONE).toISOString();
+  return taskOccurrenceDateTimeIso(dateKey, task.dueTime);
+}
+
+function taskOccurrenceDateTimeIso(dateKey: string, dueTime: string | null) {
+  const time = dueTime ?? "00:00";
+  return fromZonedTime(`${dateKey}T${time}:00`, env.DEFAULT_TIMEZONE).toISOString();
+}
+
+function isOnOrAfterStartDate(task: { dueDate: Date | null }, dateKey: string) {
+  if (!task.dueDate) return true;
+  return dateKey >= localDateKey(task.dueDate, env.DEFAULT_TIMEZONE);
 }
 
 export async function getDashboardToday(date = new Date()): Promise<DashboardToday> {
@@ -31,7 +40,13 @@ export async function getDashboardToday(date = new Date()): Promise<DashboardTod
   const start = fromZonedTime(startWallTime, env.DEFAULT_TIMEZONE);
   const end = fromZonedTime(endWallTime, env.DEFAULT_TIMEZONE);
 
-  const [members, events, tasks, lastSync] = await Promise.all([
+  const dateKeys = Array.from({ length: daysAhead + 1 }, (_, dayOffset) => {
+    const day = new Date(startWallTime);
+    day.setDate(startWallTime.getDate() + dayOffset);
+    return format(day, "yyyy-MM-dd");
+  });
+
+  const [members, events, tasks, taskCompletions, lastSync] = await Promise.all([
     prisma.familyMember.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } }),
     prisma.familyEvent.findMany({
       where: {
@@ -46,6 +61,7 @@ export async function getDashboardToday(date = new Date()): Promise<DashboardTod
       orderBy: { startDateTime: "asc" }
     }),
     prisma.task.findMany({ include: { persons: true }, orderBy: [{ isDone: "asc" }, { sortOrder: "asc" }] }),
+    prisma.taskCompletion.findMany({ where: { date: { in: dateKeys } } }),
     prisma.syncLog.findFirst({ orderBy: { startedAt: "desc" } })
   ]);
 
@@ -80,18 +96,41 @@ export async function getDashboardToday(date = new Date()): Promise<DashboardTod
     };
   });
 
-  const taskItems: DashboardItem[] = tasks
-    .map((task) => ({
+  const completionsByTaskAndDate = new Map(taskCompletions.map((completion) => [`${completion.taskId}:${completion.date}`, completion]));
+
+  const taskItems: DashboardItem[] = tasks.flatMap((task) => {
+    const recurrence = parseTaskRecurrence(task.recurrence);
+    const baseTask = {
       id: task.id,
-      kind: "task",
+      kind: "task" as const,
       title: task.title,
-      dueDateTime: taskDueDateTimeIso(task),
       personIds: personIdsFromLinks(task.persons),
       rigidity: task.rigidity as Rigidity,
-      category: "task",
-      importance: "normal",
-      isDone: task.isDone
-    }));
+      category: "task" as const,
+      importance: "normal" as const
+    };
+
+    if (!recurrence) {
+      return [{
+        ...baseTask,
+        dueDateTime: taskDueDateTimeIso(task),
+        isDone: task.isDone
+      }];
+    }
+
+    return dateKeys.flatMap((dateKey) => {
+      const occurrenceDate = fromZonedTime(`${dateKey}T12:00:00`, env.DEFAULT_TIMEZONE);
+      if (!isOnOrAfterStartDate(task, dateKey) || !isRecurringTaskDueOnDate(recurrence, occurrenceDate)) return [];
+
+      const completion = completionsByTaskAndDate.get(`${task.id}:${dateKey}`);
+      return [{
+        ...baseTask,
+        dueDateTime: taskOccurrenceDateTimeIso(dateKey, task.dueTime),
+        isDone: completion?.isDone ?? false,
+        completionDate: dateKey
+      }];
+    });
+  });
 
   const allItems = [...eventItems, ...taskItems];
   const current = findCurrent(eventItems, date);

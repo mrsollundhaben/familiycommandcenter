@@ -51,7 +51,7 @@ export function EventCard({ item, people, onDoneChanged }: EventCardProps) {
         ))}
       </div>
 
-      {item.kind === "task" ? <TaskDoneButton taskId={item.id} isDone={item.isDone} onDoneChanged={onDoneChanged} /> : null}
+      {item.kind === "task" ? <TaskDoneButton taskId={item.id} isDone={item.isDone} completionDate={item.completionDate} onDoneChanged={onDoneChanged} /> : null}
 
       {(item.preparationNotes || item.preparationChecklist?.length || item.location) && (
         <div className="mt-4 grid gap-2 text-xl font-semibold">

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/server/db/prisma";
 import { isAdminAuthenticated } from "@/server/auth/adminSession";
 import { apiError } from "@/lib/errors";
+import { taskRecurrenceSchema } from "@/domain/tasks/recurrence";
 
 const paramsSchema = z.object({ id: z.string().min(1) });
 
@@ -12,6 +13,7 @@ const taskUpdateSchema = z.object({
   rigidity: z.enum(["fixed", "flexible", "optional"]).optional(),
   dueDate: z.string().date().nullable().optional(),
   dueTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Expected HH:mm").nullable().optional(),
+  recurrence: taskRecurrenceSchema.nullable().optional(),
   personIds: z.array(z.string().min(1)).optional(),
   sortOrder: z.number().int().optional(),
   isDone: z.boolean().optional()
@@ -62,6 +64,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     ...(body.data.title !== undefined ? { title: body.data.title } : {}),
     ...(body.data.rigidity !== undefined ? { rigidity: body.data.rigidity } : {}),
     ...(body.data.dueTime !== undefined ? { dueTime: body.data.dueTime } : {}),
+    ...(body.data.recurrence !== undefined ? { recurrence: body.data.recurrence } : {}),
     ...(body.data.sortOrder !== undefined ? { sortOrder: body.data.sortOrder } : {}),
     ...(body.data.dueDate !== undefined ? { dueDate: body.data.dueDate ? new Date(`${body.data.dueDate}T00:00:00`) : null } : {}),
     ...(body.data.isDone !== undefined ? { isDone: body.data.isDone, doneAt: body.data.isDone ? new Date() : null } : {})

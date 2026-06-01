@@ -3,8 +3,10 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
+import type { TaskRecurrence } from "@/domain/tasks/recurrence";
 
 type Rigidity = "fixed" | "flexible" | "optional";
+type RecurrenceType = "none" | "daily" | "weekdays" | "weekly";
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 type TaskAdminFamilyMember = {
@@ -21,6 +23,7 @@ type TaskAdminTask = {
   dueDate: string | null;
   dueTime: string | null;
   rigidity: string;
+  recurrence: TaskRecurrence | null;
   sortOrder: number;
   isDone: boolean;
   persons: Array<{ familyMemberId: string }>;
@@ -32,6 +35,8 @@ type TaskFormState = {
   dueDate: string;
   dueTime: string;
   rigidity: Rigidity;
+  recurrenceType: RecurrenceType;
+  weeklyDays: string[];
   sortOrder: string;
   isDone: boolean;
 };
@@ -42,6 +47,8 @@ const taskFormSchema = z.object({
   dueDate: z.string().date().or(z.literal("")),
   dueTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Bitte eine Uhrzeit im Format HH:mm eintragen.").or(z.literal("")),
   rigidity: z.enum(["fixed", "flexible", "optional"]),
+  recurrenceType: z.enum(["none", "daily", "weekdays", "weekly"]),
+  weeklyDays: z.array(z.string()),
   sortOrder: z.coerce.number().int(),
   isDone: z.boolean()
 });
@@ -52,9 +59,28 @@ const emptyTaskFormState: TaskFormState = {
   dueDate: "",
   dueTime: "",
   rigidity: "flexible",
+  recurrenceType: "none",
+  weeklyDays: [],
   sortOrder: "0",
   isDone: false
 };
+
+const weekdayOptions = [
+  { value: "1", label: "Mo" },
+  { value: "2", label: "Di" },
+  { value: "3", label: "Mi" },
+  { value: "4", label: "Do" },
+  { value: "5", label: "Fr" },
+  { value: "6", label: "Sa" },
+  { value: "7", label: "So" }
+];
+
+const recurrenceOptions: Array<{ value: RecurrenceType; label: string }> = [
+  { value: "none", label: "Keine Wiederholung" },
+  { value: "daily", label: "Täglich" },
+  { value: "weekdays", label: "Werktags (Mo–Fr)" },
+  { value: "weekly", label: "Wöchentlich an ausgewählten Tagen" }
+];
 
 const rigidityOptions: Array<{ value: Rigidity; label: string }> = [
   { value: "fixed", label: "🔴 Fix" },
@@ -67,6 +93,19 @@ function dateInputValue(value: string | null) {
   return value.slice(0, 10);
 }
 
+function recurrenceToFormState(recurrence: TaskRecurrence | null): Pick<TaskFormState, "recurrenceType" | "weeklyDays"> {
+  if (!recurrence) return { recurrenceType: "none", weeklyDays: [] };
+  if (recurrence.type === "weekly") return { recurrenceType: "weekly", weeklyDays: recurrence.days.map(String) };
+  return { recurrenceType: recurrence.type, weeklyDays: [] };
+}
+
+function recurrenceFromFormState(formState: Pick<TaskFormState, "recurrenceType" | "weeklyDays">): TaskRecurrence | null {
+  if (formState.recurrenceType === "none") return null;
+  if (formState.recurrenceType === "daily") return { type: "daily" };
+  if (formState.recurrenceType === "weekdays") return { type: "weekdays" };
+  return { type: "weekly", days: [...new Set(formState.weeklyDays.map(Number))].sort((a, b) => a - b) };
+}
+
 function toFormState(task: TaskAdminTask): TaskFormState {
   return {
     title: task.title,
@@ -74,6 +113,7 @@ function toFormState(task: TaskAdminTask): TaskFormState {
     dueDate: dateInputValue(task.dueDate),
     dueTime: task.dueTime ?? "",
     rigidity: task.rigidity === "fixed" || task.rigidity === "optional" ? task.rigidity : "flexible",
+    ...recurrenceToFormState(task.recurrence),
     sortOrder: String(task.sortOrder),
     isDone: task.isDone
   };
@@ -85,6 +125,11 @@ function taskPayload(formState: TaskFormState) {
     return { error: result.error.issues[0]?.message ?? "Bitte die Formularfelder prüfen." };
   }
 
+  const recurrence = recurrenceFromFormState(result.data);
+  if (recurrence?.type === "weekly" && recurrence.days.length === 0) {
+    return { error: "Bitte mindestens einen Wochentag für die wöchentliche Wiederholung auswählen." };
+  }
+
   return {
     payload: {
       title: result.data.title.trim(),
@@ -92,6 +137,7 @@ function taskPayload(formState: TaskFormState) {
       dueDate: result.data.dueDate || null,
       dueTime: result.data.dueTime || null,
       rigidity: result.data.rigidity,
+      recurrence,
       sortOrder: result.data.sortOrder,
       isDone: result.data.isDone
     }
@@ -153,6 +199,10 @@ export function TaskAdminEditor({ tasks, familyMembers }: { tasks: TaskAdminTask
 
   function togglePerson(formState: TaskFormState, personId: string, checked: boolean) {
     return checked ? [...formState.personIds, personId] : formState.personIds.filter((id) => id !== personId);
+  }
+
+  function toggleWeeklyDay(formState: TaskFormState, day: string, checked: boolean) {
+    return checked ? [...formState.weeklyDays, day] : formState.weeklyDays.filter((value) => value !== day);
   }
 
   async function createTask(event: FormEvent<HTMLFormElement>) {
@@ -256,6 +306,25 @@ export function TaskAdminEditor({ tasks, familyMembers }: { tasks: TaskAdminTask
             Fälligkeitszeit
             <input type="time" value={formState.dueTime} onChange={(event) => onUpdate({ dueTime: event.target.value })} className="rounded-2xl border border-slate-200 px-4 py-3 text-lg text-slate-950" />
           </label>
+          <label className="grid gap-2 font-semibold text-slate-700">
+            Wiederholung
+            <select value={formState.recurrenceType} onChange={(event) => onUpdate({ recurrenceType: event.target.value as RecurrenceType })} className="rounded-2xl border border-slate-200 px-4 py-3 text-lg text-slate-950">
+              {recurrenceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          {formState.recurrenceType === "weekly" ? (
+            <fieldset className="rounded-2xl border border-slate-200 px-4 py-3">
+              <legend className="font-semibold text-slate-700">Wochentage</legend>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {weekdayOptions.map((day) => (
+                  <label key={day.value} className="flex items-center gap-2 rounded-full bg-slate-50 px-3 py-2 font-bold text-slate-800">
+                    <input type="checkbox" checked={formState.weeklyDays.includes(day.value)} onChange={(event) => onUpdate({ weeklyDays: toggleWeeklyDay(formState, day.value, event.target.checked) })} className="h-4 w-4" />
+                    {day.label}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ) : null}
           <label className="grid gap-2 font-semibold text-slate-700">
             Verbindlichkeit
             <select value={formState.rigidity} onChange={(event) => onUpdate({ rigidity: event.target.value as Rigidity })} className="rounded-2xl border border-slate-200 px-4 py-3 text-lg text-slate-950">
