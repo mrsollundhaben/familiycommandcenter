@@ -11,6 +11,15 @@ function personIdsFromLinks(links: Array<{ familyMemberId: string }>) {
   return links.map((link) => link.familyMemberId);
 }
 
+function taskDueDateTimeIso(task: { dueDate: Date | null; dueTime: string | null }) {
+  if (!task.dueDate) return null;
+
+  if (!task.dueTime) return task.dueDate.toISOString();
+
+  const dateKey = localDateKey(task.dueDate, env.DEFAULT_TIMEZONE);
+  return fromZonedTime(`${dateKey}T${task.dueTime}:00`, env.DEFAULT_TIMEZONE).toISOString();
+}
+
 export async function getDashboardToday(date = new Date()): Promise<DashboardToday> {
   const daysAhead = Math.max(env.SYNC_DAYS_AHEAD, 3);
   const zoned = toZonedTime(date, env.DEFAULT_TIMEZONE);
@@ -72,12 +81,11 @@ export async function getDashboardToday(date = new Date()): Promise<DashboardTod
   });
 
   const taskItems: DashboardItem[] = tasks
-    .filter((task) => !task.dueDate || localDateKey(task.dueDate, env.DEFAULT_TIMEZONE) === format(zoned, "yyyy-MM-dd"))
     .map((task) => ({
       id: task.id,
       kind: "task",
       title: task.title,
-      dueDateTime: task.dueDate?.toISOString() ?? null,
+      dueDateTime: taskDueDateTimeIso(task),
       personIds: personIdsFromLinks(task.persons),
       rigidity: task.rigidity as Rigidity,
       category: "task",
