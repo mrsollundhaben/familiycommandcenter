@@ -53,9 +53,14 @@ export function EventCard({ item, people, onDoneChanged }: EventCardProps) {
 
       {item.kind === "task" ? <TaskDoneButton taskId={item.id} isDone={item.isDone} onDoneChanged={onDoneChanged} /> : null}
 
-      {(item.preparationNotes || item.location) && (
+      {(item.preparationNotes || item.preparationChecklist?.length || item.location) && (
         <div className="mt-4 grid gap-2 text-xl font-semibold">
           {item.preparationNotes ? <p className="flex items-center gap-2"><Package /> {item.preparationNotes}</p> : null}
+          {item.preparationChecklist?.length ? (
+            <p className="flex items-center gap-2">
+              <Package /> Vorbereitung ab {item.prepareAt ? format(new Date(item.prepareAt), "HH:mm", { locale: de }) : "15 Minuten vorher"}
+            </p>
+          ) : null}
           {item.location ? <p className="flex items-center gap-2"><MapPin /> {item.location}</p> : null}
         </div>
       )}

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
-import { RefreshCw } from "lucide-react";
+import { CheckCircle2, Package, RefreshCw } from "lucide-react";
 import { SyncStatusBadge } from "@/components/dashboard/SyncStatusBadge";
 import { EventCard } from "@/components/dashboard/EventCard";
 import { FamilyMemberBar } from "@/components/dashboard/FamilyMemberBar";
@@ -110,6 +110,36 @@ function nextWithCountdown(item: DashboardItem | null, now: Date) {
   return item?.startDateTime ? { ...item, countdownMinutes: minutesUntil(item.startDateTime, now) } : null;
 }
 
+function livePreparationChecklist(item: DashboardItem, now: Date) {
+  if (!item.preparationChecklist?.length) return [];
+  return item.preparationChecklist.map((hint) => {
+    if (!item.leaveAt || !hint.startsWith("Losgehen")) return hint;
+    return `Losgehen in ${minutesUntil(item.leaveAt, now)} Minuten`;
+  });
+}
+
+function NextPreparationHints({ item, now }: { item: DashboardItem; now: Date }) {
+  const checklist = livePreparationChecklist(item, now);
+  if (checklist.length === 0) return null;
+
+  return (
+    <div className="rounded-3xl border-4 border-violet-200 bg-violet-50 p-5 text-violet-950">
+      <div className="mb-3 flex items-center gap-3 text-3xl font-black">
+        <Package className="h-8 w-8" />
+        <span>Vorbereitung</span>
+      </div>
+      <ul className="grid gap-2 text-2xl font-black">
+        {checklist.map((hint) => (
+          <li key={hint} className="flex items-center gap-3 rounded-2xl bg-white/70 px-4 py-3">
+            <CheckCircle2 className="h-7 w-7 shrink-0" />
+            <span>{hint}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function LiveDashboard({ syncDaysAhead }: { syncDaysAhead: number }) {
   const [data, setData] = useState<DashboardToday | null>(null);
   const [now, setNow] = useState(currentTime);
@@ -207,6 +237,7 @@ export function LiveDashboard({ syncDaysAhead }: { syncDaysAhead: number }) {
           {next ? (
             <div className="grid gap-4">
               <div className="rounded-3xl bg-indigo-50 p-5 text-3xl font-black text-indigo-950">Noch {next.countdownMinutes} Minuten</div>
+              <NextPreparationHints item={next} now={now} />
               <EventCard item={next} people={data.familyMembers} onDoneChanged={refetchDashboardAfterTaskDone} />
             </div>
           ) : (

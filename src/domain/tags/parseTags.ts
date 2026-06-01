@@ -14,6 +14,7 @@ export type ParsedTags = {
   category?: EventCategory;
   importance?: Importance;
   preparationTags: string[];
+  needsPackingPreparation: boolean;
   preparationNotes?: string;
 };
 
@@ -56,6 +57,7 @@ export function parseFamilyTags(input: { title: string; description?: string | n
   const personKeys = tags.filter((tag) => personTags.has(tag) && tag !== "ALLE");
   const appliesToAll = tags.includes("ALLE");
   const prepTags = tags.filter((tag) => preparationTags.has(tag));
+  const needsPackingPreparation = prepTags.includes("PACKEN");
 
   return {
     cleanTitle: cleanTitle(input.title),
@@ -67,6 +69,7 @@ export function parseFamilyTags(input: { title: string; description?: string | n
     category: pickCategory(tags),
     importance: pickImportance(tags, input.title),
     preparationTags: prepTags,
-    preparationNotes: prepTags.length ? prepTags.map((tag) => (tag === "PACKEN" ? "Packen / vorbereiten" : tag)).join(", ") : undefined
+    needsPackingPreparation,
+    preparationNotes: prepTags.length ? prepTags.map((tag) => (tag === "PACKEN" ? "Tasche packen" : tag)).join(", ") : undefined
   };
 }

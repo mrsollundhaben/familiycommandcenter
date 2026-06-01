@@ -21,6 +21,9 @@ export type DashboardItem = {
   category: EventCategory;
   importance: Importance;
   preparationNotes?: string | null;
+  leaveAt?: string | null;
+  prepareAt?: string | null;
+  preparationChecklist?: string[];
   location?: string | null;
   isDone: boolean;
 };
