@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { isAdminAuthenticated } from "@/server/auth/adminSession";
+import { SyncButton, type AdminSyncLog } from "@/components/admin/SyncButton";
 import { prisma } from "@/server/db/prisma";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const authed = await isAdminAuthenticated();
-  const lastSync = authed ? await prisma.syncLog.findFirst({ orderBy: { startedAt: "desc" } }) : null;
+  const syncLogs = authed ? await prisma.syncLog.findMany({ orderBy: { startedAt: "desc" }, take: 10 }) : [];
+  const initialSyncLogs: AdminSyncLog[] = syncLogs.map((log) => ({
+    ...log,
+    startedAt: log.startedAt.toISOString(),
+    finishedAt: log.finishedAt?.toISOString() ?? null
+  }));
 
   if (!authed) {
     return (
@@ -24,11 +30,7 @@ export default async function AdminPage() {
   return (
     <main className="mx-auto max-w-5xl p-8">
       <h1 className="mb-6 text-4xl font-black">Family Command Center Admin</h1>
-      <div className="mb-6 rounded-3xl bg-white p-6 shadow-sm">
-        <h2 className="text-2xl font-bold">Sync-Status</h2>
-        <p>Status: {lastSync?.status ?? "noch kein Sync"}</p>
-        <p>Letzte Meldung: {lastSync?.message ?? "—"}</p>
-      </div>
+      <SyncButton initialLogs={initialSyncLogs} />
       <nav className="grid gap-4 md:grid-cols-3">
         <Link className="rounded-3xl bg-white p-6 text-2xl font-black shadow-sm" href="/admin/family-members">Familie</Link>
         <Link className="rounded-3xl bg-white p-6 text-2xl font-black shadow-sm" href="/admin/calendar-sources">Kalender</Link>
