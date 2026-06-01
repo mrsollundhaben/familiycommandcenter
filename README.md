@@ -153,3 +153,21 @@ Erwartung:
 - Status idealerweise `success`, oder `partial` nur bei echten nicht-parsbaren Einzelereignissen.
 - `eventsFetched > 0`, wenn iCloud-Termine im Zeitraum vorhanden sind.
 - Das Dashboard zeigt importierte Termine unter `/dashboard/today`.
+
+## iCloud-Personen-Tags für Familienmitglieder
+
+Im Adminbereich unter `/admin/family-members` gibt es eine Tag-Hilfe, die je Familienmitglied den sichtbaren Namen, den `shortName` und den aktuell verwendbaren iCloud-Tag anzeigt. Die Standard-Tags sind:
+
+| Tag | Übliche Zuordnung |
+| --- | --- |
+| `[MAMA]` | Mama / Mutter |
+| `[PAPA]` | Papa / Vater |
+| `[KIND1]` | Kind 1 / K1 |
+| `[KIND2]` | Kind 2 / K2 |
+| `[KIND3]` | Kind 3 / K3 |
+| `[KIND4]` | Kind 4 / K4 |
+| `[ALLE]` | alle aktiven Familienmitglieder |
+
+`displayName` ist der sichtbare Name im Dashboard und im Adminbereich. Dieser Name darf lesbar und kindgerecht sein. Die Tags in iCloud sollen dagegen stabil bleiben, damit bestehende und wiederkehrende Termine beim Sync weiterhin zuverlässig denselben Familienmitgliedern zugeordnet werden. Deshalb sollten bereits verwendete Tags wie `[KIND1]`, `[MAMA]` oder `[PAPA]` nicht leichtfertig umbenannt oder in bestehenden iCloud-Terminen ausgetauscht werden.
+
+Später können pro Person frei konfigurierbare Aliase ergänzt werden, damit zusätzliche Schreibweisen möglich sind, ohne die stabilen Standard-Tags aufzugeben.

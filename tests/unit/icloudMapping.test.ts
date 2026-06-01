@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildICloudExternalId, normalizeICloudOccurrence } from "@/domain/events/icloudMapping";
+import { buildFamilyMemberTagHelpRows, buildICloudExternalId, normalizeICloudOccurrence } from "@/domain/events/icloudMapping";
 import { classifyICloudUpsert, getSyncCompletionStatus, hasICloudCredentials } from "@/domain/events/icloudSyncLogic";
 
 const members = [
@@ -45,6 +45,15 @@ describe("iCloud event mapping", () => {
     expect(event.personIds).toEqual(["k1"]);
     expect(event.preparationNotes).toBe("Tasche packen");
     expect(event.rawHash).toHaveLength(64);
+  });
+
+  it("builds admin tag help rows from the iCloud person alias mapping", () => {
+    expect(buildFamilyMemberTagHelpRows(members)).toEqual([
+      { id: "mama", displayName: "Mama", shortName: "Mama", isActive: undefined, tags: ["[MAMA]"] },
+      { id: "papa", displayName: "Papa", shortName: "Papa", isActive: undefined, tags: ["[PAPA]"] },
+      { id: "k1", displayName: "Kind 1", shortName: "K1", isActive: undefined, tags: ["[KIND1]"] },
+      { id: "k2", displayName: "Kind 2", shortName: "K2", isActive: undefined, tags: ["[KIND2]"] }
+    ]);
   });
 
   it("uses CalendarSource default people when no person tag exists", () => {
