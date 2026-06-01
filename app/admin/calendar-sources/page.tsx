@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { CalendarSourceEditor } from "@/components/admin/CalendarSourceEditor";
 import { prisma } from "@/server/db/prisma";
 import { isAdminAuthenticated } from "@/server/auth/adminSession";
+import { AdminBackLink } from "@/components/admin/AdminBackLink";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,9 @@ export default async function CalendarSourcesPage() {
   ]);
   return (
     <main className="mx-auto max-w-5xl p-8">
+      <div className="mb-6">
+        <AdminBackLink />
+      </div>
       <h1 className="mb-6 text-4xl font-black">Kalenderquellen</h1>
       <p className="mb-6 rounded-2xl bg-amber-50 p-4 text-amber-950">iCloud-Kalender werden read-only synchronisiert. Zugangsdaten kommen ausschließlich aus Environment Variables und werden hier nicht gespeichert.</p>
       <CalendarSourceEditor

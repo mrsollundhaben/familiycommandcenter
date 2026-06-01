@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/server/db/prisma";
 import { isAdminAuthenticated } from "@/server/auth/adminSession";
+import { AdminBackLink } from "@/components/admin/AdminBackLink";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,9 @@ export default async function TasksPage() {
   const tasks = await prisma.task.findMany({ include: { persons: true }, orderBy: { sortOrder: "asc" } });
   return (
     <main className="mx-auto max-w-5xl p-8">
+      <div className="mb-6">
+        <AdminBackLink />
+      </div>
       <h1 className="mb-6 text-4xl font-black">Aufgaben</h1>
       <div className="grid gap-4">
         {tasks.length ? tasks.map((task) => (
