@@ -22,13 +22,7 @@ function timeLabel(item: DashboardItem) {
   return format(new Date(item.startDateTime), "HH:mm", { locale: de });
 }
 
-type EventCardProps = {
-  item: DashboardItem;
-  people: DashboardPerson[];
-  onDoneChanged?: (isDone: boolean, taskId: string) => Promise<void> | void;
-};
-
-export function EventCard({ item, people, onDoneChanged }: EventCardProps) {
+export function EventCard({ item, people }: { item: DashboardItem; people: DashboardPerson[] }) {
   const assigned = people.filter((person) => item.personIds.includes(person.id));
   return (
     <article className={`rounded-3xl border-4 p-5 shadow-sm ${rigidityStyles[item.rigidity]} ${item.isDone ? "opacity-60" : ""}`}>
@@ -51,16 +45,11 @@ export function EventCard({ item, people, onDoneChanged }: EventCardProps) {
         ))}
       </div>
 
-      {item.kind === "task" ? <TaskDoneButton taskId={item.id} isDone={item.isDone} completionDate={item.completionDate} onDoneChanged={onDoneChanged} /> : null}
+      {item.kind === "task" ? <TaskDoneButton taskId={item.id} isDone={item.isDone} /> : null}
 
-      {(item.preparationNotes || item.preparationChecklist?.length || item.location) && (
+      {(item.preparationNotes || item.location) && (
         <div className="mt-4 grid gap-2 text-xl font-semibold">
           {item.preparationNotes ? <p className="flex items-center gap-2"><Package /> {item.preparationNotes}</p> : null}
-          {item.preparationChecklist?.length ? (
-            <p className="flex items-center gap-2">
-              <Package /> Vorbereitung ab {item.prepareAt ? format(new Date(item.prepareAt), "HH:mm", { locale: de }) : "15 Minuten vorher"}
-            </p>
-          ) : null}
           {item.location ? <p className="flex items-center gap-2"><MapPin /> {item.location}</p> : null}
         </div>
       )}

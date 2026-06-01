@@ -1,8 +1,7 @@
-import { createHash } from "crypto";
 import { createDAVClient } from "tsdav";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { prisma } from "@/server/db/prisma";
-import { getEnv } from "@/server/config/env";
+import { env } from "@/server/config/env";
 import { expandICalendarEvents } from "@/server/services/icalExpand";
 import { normalizeICloudOccurrence, type NormalizedICloudEvent } from "@/domain/events/icloudMapping";
 import { classifyICloudUpsert, getSyncCompletionStatus, hasICloudCredentials } from "@/domain/events/icloudSyncLogic";
@@ -31,30 +30,23 @@ type SyncError = {
   code: string;
   message: string;
   calendar?: string;
-  objectRef?: string;
 };
 
-function caldavBaseUrl(caldavUrl: string) {
-  return caldavUrl.endsWith("/") ? caldavUrl : `${caldavUrl}/`;
+function caldavBaseUrl() {
+  return env.CALDAV_URL.endsWith("/") ? env.CALDAV_URL : `${env.CALDAV_URL}/`;
 }
 
-type SyncWindowInput = Date | { timezone: string; daysAhead: number; now?: Date };
-
-function syncWindow(input: SyncWindowInput = new Date()) {
-  const runtimeEnv = getEnv();
-  const timezone = input instanceof Date ? runtimeEnv.DEFAULT_TIMEZONE : input.timezone;
-  const daysAhead = input instanceof Date ? runtimeEnv.SYNC_DAYS_AHEAD : input.daysAhead;
-  const now = input instanceof Date ? input : input.now ?? new Date();
-  const zonedNow = toZonedTime(now, timezone);
+function syncWindow(now = new Date()) {
+  const zonedNow = toZonedTime(now, env.DEFAULT_TIMEZONE);
   const startWallTime = new Date(zonedNow);
   startWallTime.setHours(0, 0, 0, 0);
   const endWallTime = new Date(startWallTime);
-  endWallTime.setDate(startWallTime.getDate() + daysAhead);
+  endWallTime.setDate(startWallTime.getDate() + env.SYNC_DAYS_AHEAD);
   endWallTime.setHours(23, 59, 59, 999);
 
   return {
-    start: fromZonedTime(startWallTime, timezone),
-    end: fromZonedTime(endWallTime, timezone)
+    start: fromZonedTime(startWallTime, env.DEFAULT_TIMEZONE),
+    end: fromZonedTime(endWallTime, env.DEFAULT_TIMEZONE)
   };
 }
 
@@ -66,21 +58,12 @@ function supportsEvents(calendar: DAVCalendarLike) {
   return !calendar.components?.length || calendar.components.includes("VEVENT");
 }
 
-function calendarObjectReference(object: CalendarObjectLike, index: number) {
-  if (!object.url) return `object-index:${index}`;
-  return `sha256:${createHash("sha256").update(object.url).digest("hex").slice(0, 16)}`;
-}
-
-function calendarObjectErrorMessage() {
-  return "Failed to process iCalendar object.";
-}
-
-async function fetchRemoteCalendars(input: { caldavUrl: string; username: string; appPassword: string }) {
+async function fetchRemoteCalendars() {
   const client = await createDAVClient({
-    serverUrl: caldavBaseUrl(input.caldavUrl),
+    serverUrl: caldavBaseUrl(),
     credentials: {
-      username: input.username,
-      password: input.appPassword
+      username: env.ICLOUD_USERNAME!,
+      password: env.ICLOUD_APP_PASSWORD!
     },
     authMethod: "Basic",
     defaultAccountType: "caldav"
@@ -221,16 +204,6 @@ async function finishSyncLog(input: { logId: string; counters: SyncCounters; err
 }
 
 export async function syncICloudCalendars() {
-  const runtimeEnv = getEnv();
-  const runningLog = await prisma.syncLog.findFirst({
-    where: { status: "running", finishedAt: null },
-    orderBy: { startedAt: "desc" }
-  });
-  if (runningLog) {
-    console.log(`iCloud sync skipped; sync already running since ${runningLog.startedAt.toISOString()}`);
-    return runningLog;
-  }
-
   console.log("iCloud sync started");
   const log = await prisma.syncLog.create({ data: { status: "running", message: "iCloud sync started" } });
   const counters: SyncCounters = { eventsFetched: 0, eventsCreated: 0, eventsUpdated: 0, eventsDeleted: 0 };
@@ -238,7 +211,7 @@ export async function syncICloudCalendars() {
   const seenExternalIds = new Set<string>();
   const syncedCalendarIds: string[] = [];
 
-  if (!hasICloudCredentials({ username: runtimeEnv.ICLOUD_USERNAME, appPassword: runtimeEnv.ICLOUD_APP_PASSWORD })) {
+  if (!hasICloudCredentials({ username: env.ICLOUD_USERNAME, appPassword: env.ICLOUD_APP_PASSWORD })) {
     console.log("iCloud sync failed: missing credentials");
     return prisma.syncLog.update({
       where: { id: log.id },
@@ -251,11 +224,9 @@ export async function syncICloudCalendars() {
     });
   }
 
-  const username = runtimeEnv.ICLOUD_USERNAME!.trim();
-  const appPassword = runtimeEnv.ICLOUD_APP_PASSWORD!.trim();
-  const { start, end } = syncWindow({ timezone: runtimeEnv.DEFAULT_TIMEZONE, daysAhead: runtimeEnv.SYNC_DAYS_AHEAD });
+  const { start, end } = syncWindow();
   try {
-    const { client, calendars } = await fetchRemoteCalendars({ caldavUrl: runtimeEnv.CALDAV_URL, username, appPassword });
+    const { client, calendars } = await fetchRemoteCalendars();
     console.log(`iCloud calendars found: ${calendars.length}`);
     const sourcesToSync = await ensureCalendarSources(calendars);
     const familyMembers = await prisma.familyMember.findMany({ where: { isActive: true } });
@@ -275,40 +246,23 @@ export async function syncICloudCalendars() {
         })) as CalendarObjectLike[];
 
         let calendarFetched = 0;
-        let calendarProcessedEvents = 0;
-        let calendarObjectErrors = 0;
-        for (const [objectIndex, object] of objects.entries()) {
+        for (const object of objects) {
           if (!object.data) continue;
-          const objectRef = calendarObjectReference(object, objectIndex);
-          try {
-            const occurrences = expandICalendarEvents(object.data, start, end);
-            calendarFetched += occurrences.length;
-            for (const occurrence of occurrences) {
-              const normalized = normalizeICloudOccurrence({ occurrence, calendarSource: source, members: familyMembers });
-              seenExternalIds.add(normalized.externalId);
-              const result = await upsertICloudEvent(normalized, source.id);
-              calendarProcessedEvents += 1;
-              if (result === "created") counters.eventsCreated += 1;
-              if (result === "updated") counters.eventsUpdated += 1;
-            }
-          } catch {
-            calendarObjectErrors += 1;
-            errors.push({
-              code: "CALENDAR_OBJECT_SYNC_FAILED",
-              calendar: source.calendarName,
-              objectRef,
-              message: calendarObjectErrorMessage()
-            });
-            console.log(`Calendar object sync failed: ${source.calendarName}; objectRef=${objectRef}`);
+          const occurrences = expandICalendarEvents(object.data, start, end);
+          calendarFetched += occurrences.length;
+          for (const occurrence of occurrences) {
+            const normalized = normalizeICloudOccurrence({ occurrence, calendarSource: source, members: familyMembers });
+            seenExternalIds.add(normalized.externalId);
+            const result = await upsertICloudEvent(normalized, source.id);
+            if (result === "created") counters.eventsCreated += 1;
+            if (result === "updated") counters.eventsUpdated += 1;
           }
         }
 
         counters.eventsFetched += calendarFetched;
-        const importedOrClean = calendarProcessedEvents > 0 || calendarObjectErrors === 0;
-        const lastSyncStatus = calendarObjectErrors > 0 ? (calendarProcessedEvents > 0 ? "partial" : "failed") : "success";
-        if (importedOrClean) syncedCalendarIds.push(source.id);
-        await prisma.calendarSource.update({ where: { id: source.id }, data: { lastSyncAt: new Date(), lastSyncStatus } });
-        console.log(`Calendar synced: ${source.calendarName}; events found: ${calendarFetched}; object errors: ${calendarObjectErrors}`);
+        syncedCalendarIds.push(source.id);
+        await prisma.calendarSource.update({ where: { id: source.id }, data: { lastSyncAt: new Date(), lastSyncStatus: "success" } });
+        console.log(`Calendar synced: ${source.calendarName}; events found: ${calendarFetched}`);
       } catch (error) {
         await prisma.calendarSource.update({ where: { id: source.id }, data: { lastSyncAt: new Date(), lastSyncStatus: "failed" } });
         errors.push({ code: "CALENDAR_SYNC_FAILED", calendar: source.calendarName, message: error instanceof Error ? error.message : "Calendar sync failed" });
@@ -346,6 +300,5 @@ export async function syncICloudCalendars() {
 export const syncInternals = {
   syncWindow,
   markDeletedICloudEvents,
-  upsertICloudEvent,
-  calendarObjectReference
+  upsertICloudEvent
 };

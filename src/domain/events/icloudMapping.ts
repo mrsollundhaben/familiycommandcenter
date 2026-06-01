@@ -44,7 +44,7 @@ export type NormalizedICloudEvent = {
   rawHash: string;
 };
 
-export const personTagAliases: Record<string, string[]> = {
+const personTagAliases: Record<string, string[]> = {
   MAMA: ["mama", "mutter"],
   PAPA: ["papa", "vater"],
   KIND1: ["kind1", "kind 1", "k1"],
@@ -53,46 +53,8 @@ export const personTagAliases: Record<string, string[]> = {
   KIND4: ["kind4", "kind 4", "k4"]
 };
 
-export function normalizeFamilyMemberTagLookup(value: string) {
+function normalizeLookup(value: string) {
   return value.toLocaleLowerCase("de-AT").replace(/[^a-z0-9äöüß]/g, "");
-}
-
-export type FamilyMemberTagHelpRow = {
-  id: string;
-  displayName: string;
-  shortName: string;
-  isActive?: boolean;
-  tags: string[];
-};
-
-export function buildFamilyMemberTagHelpRows(members: Array<MemberLike & { isActive?: boolean }>): FamilyMemberTagHelpRow[] {
-  const rows = members.map((member) => ({
-    id: member.id,
-    displayName: member.displayName,
-    shortName: member.shortName,
-    isActive: member.isActive,
-    tags: [] as string[]
-  }));
-
-  const rowsByMemberId = new Map(rows.map((row) => [row.id, row]));
-  const lookup = new Map<string, string>();
-
-  for (const member of members) {
-    lookup.set(normalizeFamilyMemberTagLookup(member.id), member.id);
-    lookup.set(normalizeFamilyMemberTagLookup(member.shortName), member.id);
-    lookup.set(normalizeFamilyMemberTagLookup(member.displayName), member.id);
-  }
-
-  for (const [tag, aliases] of Object.entries(personTagAliases)) {
-    const possibleKeys = [tag, ...aliases];
-    const memberId = possibleKeys
-      .map((alias) => lookup.get(normalizeFamilyMemberTagLookup(alias)))
-      .find((id): id is string => Boolean(id));
-
-    if (memberId) rowsByMemberId.get(memberId)?.tags.push(`[${tag}]`);
-  }
-
-  return rows;
 }
 
 function isRigidity(value: string): value is Rigidity {
@@ -135,15 +97,15 @@ export function mapPersonTags(input: { personKeys: string[]; appliesToAll: boole
 
   const lookup = new Map<string, string>();
   for (const member of input.members) {
-    lookup.set(normalizeFamilyMemberTagLookup(member.id), member.id);
-    lookup.set(normalizeFamilyMemberTagLookup(member.shortName), member.id);
-    lookup.set(normalizeFamilyMemberTagLookup(member.displayName), member.id);
+    lookup.set(normalizeLookup(member.id), member.id);
+    lookup.set(normalizeLookup(member.shortName), member.id);
+    lookup.set(normalizeLookup(member.displayName), member.id);
   }
 
   const mapped = new Set<string>();
   for (const key of input.personKeys) {
     for (const alias of personTagAliases[key] ?? [key]) {
-      const memberId = lookup.get(normalizeFamilyMemberTagLookup(alias));
+      const memberId = lookup.get(normalizeLookup(alias));
       if (memberId) mapped.add(memberId);
     }
   }

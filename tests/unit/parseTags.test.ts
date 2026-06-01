@@ -8,8 +8,7 @@ describe("parseFamilyTags", () => {
     expect(result.rigidity).toBe("fixed");
     expect(result.personKeys).toEqual(["KIND1"]);
     expect(result.importance).toBe("important");
-    expect(result.needsPackingPreparation).toBe(true);
-    expect(result.preparationNotes).toBe("Tasche packen");
+    expect(result.preparationNotes).toBe("Packen / vorbereiten");
   });
 
   it("reads tags from descriptions and ignores unknown tags", () => {

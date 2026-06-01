@@ -71,8 +71,7 @@ model Task {
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
-  persons     TaskPerson[]
-  completions TaskCompletion[]
+  persons TaskPerson[]
 }
 
 model CalendarSource {
@@ -125,19 +124,4 @@ model TaskPerson {
   familyMember FamilyMember @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
 
   @@id([taskId, familyMemberId])
-}
-
-model TaskCompletion {
-  id        String    @id @default(cuid())
-  taskId    String
-  date      String
-  isDone    Boolean   @default(false)
-  doneAt    DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
-
-  @@unique([taskId, date])
-  @@index([date])
 }
