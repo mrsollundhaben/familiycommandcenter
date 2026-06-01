@@ -8,7 +8,7 @@ import { SyncStatusBadge } from "@/components/dashboard/SyncStatusBadge";
 import { EventCard } from "@/components/dashboard/EventCard";
 import { FamilyMemberBar } from "@/components/dashboard/FamilyMemberBar";
 import { findCurrent, findNext, minutesUntil } from "@/domain/events/grouping";
-import type { DashboardItem, DashboardToday } from "@/domain/events/types";
+import type { DashboardDaySection, DashboardItem, DashboardToday } from "@/domain/events/types";
 
 const DASHBOARD_REFRESH_MS = 15_000;
 const DASHBOARD_SYNC_RUNNING_REFRESH_MS = 3_000;
@@ -47,6 +47,37 @@ function SyncNotice({ data, lastUpdatedAt, error, now }: { data: DashboardToday 
         </p>
       ) : null}
     </div>
+  );
+}
+
+function DayItemsSection({ day, people, onDoneChanged }: { day: DashboardDaySection; people: DashboardToday["familyMembers"]; onDoneChanged: (isDone: boolean, taskId: string) => Promise<void> | void }) {
+  const date = new Date(`${day.date}T12:00:00`);
+  const isToday = day.dayOffset === 0;
+
+  return (
+    <section className="rounded-[2rem] bg-white p-6 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-4xl font-black">{day.label}</h2>
+          <p className="text-xl font-semibold capitalize text-slate-500">{format(date, "EEEE, d. MMMM", { locale: de })}</p>
+        </div>
+        {day.isLimited ? <p className="rounded-full bg-slate-100 px-4 py-2 text-lg font-bold text-slate-600">Fixe & wichtige Termine</p> : null}
+      </div>
+
+      {day.items.length ? (
+        <div className="grid gap-4">
+          {day.items.map((item) => <EventCard key={`${day.date}-${item.kind}-${item.id}`} item={item} people={people} onDoneChanged={onDoneChanged} />)}
+        </div>
+      ) : (
+        <p className="rounded-3xl bg-slate-50 p-6 text-3xl font-black text-slate-500">{isToday ? "Heute nichts mehr geplant." : "Keine fixen oder wichtigen Termine."}</p>
+      )}
+
+      {day.hiddenItemCount > 0 ? (
+        <p className="mt-4 rounded-3xl bg-slate-50 p-4 text-xl font-bold text-slate-600">
+          {day.hiddenItemCount} weitere {day.hiddenItemCount === 1 ? "Eintrag" : "Einträge"} ausgeblendet, damit das Dashboard übersichtlich bleibt.
+        </p>
+      ) : null}
+    </section>
   );
 }
 
@@ -133,10 +164,10 @@ export function LiveDashboard({ syncDaysAhead }: { syncDaysAhead: number }) {
     };
   }, [refresh]);
 
-  const liveItems = useMemo(() => data?.sections.later ?? [], [data]);
-  const current = useMemo(() => findCurrent(liveItems, now), [liveItems, now]);
-  const next = useMemo(() => nextWithCountdown(findNext(liveItems, now), now), [liveItems, now]);
-  const allItems = useMemo(() => (data ? [...data.sections.allDay, ...data.sections.later, ...data.sections.tasks] : []), [data]);
+  const todayEvents = useMemo(() => data?.sections.days[0]?.items.filter((item) => item.kind === "event") ?? [], [data]);
+  const current = useMemo(() => findCurrent(todayEvents, now), [todayEvents, now]);
+  const next = useMemo(() => nextWithCountdown(data?.next ?? findNext(todayEvents, now), now), [data?.next, todayEvents, now]);
+  const allItems = useMemo(() => data?.sections.days.flatMap((day) => day.items) ?? [], [data]);
   const refetchDashboardAfterTaskDone = useCallback(async () => {
     await refresh();
   }, [refresh]);
@@ -184,16 +215,11 @@ export function LiveDashboard({ syncDaysAhead }: { syncDaysAhead: number }) {
         </div>
       </section>
 
-      <section className="mb-6 grid gap-4">
-        <h2 className="text-4xl font-black">Tagesliste</h2>
-        {data.sections.allDay.map((item) => <EventCard key={item.id} item={item} people={data.familyMembers} onDoneChanged={refetchDashboardAfterTaskDone} />)}
-        {data.sections.later.map((item) => <EventCard key={item.id} item={item} people={data.familyMembers} onDoneChanged={refetchDashboardAfterTaskDone} />)}
-      </section>
-
-      <section className="mb-6 grid gap-4">
-        <h2 className="text-4xl font-black">Aufgaben</h2>
-        {data.sections.tasks.length ? data.sections.tasks.map((item) => <EventCard key={item.id} item={item} people={data.familyMembers} onDoneChanged={refetchDashboardAfterTaskDone} />) : <p className="rounded-3xl bg-white p-6 text-3xl font-black">Keine offenen Aufgaben.</p>}
-      </section>
+      <div className="mb-6 grid gap-6">
+        {data.sections.days.map((day) => (
+          <DayItemsSection key={day.date} day={day} people={data.familyMembers} onDoneChanged={refetchDashboardAfterTaskDone} />
+        ))}
+      </div>
 
       <FamilyMemberBar people={data.familyMembers} items={allItems} />
     </main>

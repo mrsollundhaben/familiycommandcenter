@@ -1,8 +1,8 @@
-import { format, isSameDay } from "date-fns";
+import { format } from "date-fns";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
 import { prisma } from "@/server/db/prisma";
 import { env } from "@/server/config/env";
-import { findCurrent, findNext, minutesUntil } from "@/domain/events/grouping";
+import { findCurrent, findNext, groupDashboardDays, localDateKey, minutesUntil } from "@/domain/events/grouping";
 import type { DashboardItem, DashboardToday } from "@/domain/events/types";
 import type { EventCategory, Importance, Rigidity } from "@/domain/events/valueTypes";
 
@@ -11,11 +11,12 @@ function personIdsFromLinks(links: Array<{ familyMemberId: string }>) {
 }
 
 export async function getDashboardToday(date = new Date()): Promise<DashboardToday> {
+  const daysAhead = Math.max(env.SYNC_DAYS_AHEAD, 3);
   const zoned = toZonedTime(date, env.DEFAULT_TIMEZONE);
   const startWallTime = new Date(zoned);
   startWallTime.setHours(0, 0, 0, 0);
   const endWallTime = new Date(startWallTime);
-  endWallTime.setDate(startWallTime.getDate() + env.SYNC_DAYS_AHEAD);
+  endWallTime.setDate(startWallTime.getDate() + daysAhead);
   endWallTime.setHours(23, 59, 59, 999);
   const start = fromZonedTime(startWallTime, env.DEFAULT_TIMEZONE);
   const end = fromZonedTime(endWallTime, env.DEFAULT_TIMEZONE);
@@ -48,7 +49,7 @@ export async function getDashboardToday(date = new Date()): Promise<DashboardTod
   }));
 
   const taskItems: DashboardItem[] = tasks
-    .filter((task) => !task.dueDate || isSameDay(task.dueDate, zoned))
+    .filter((task) => !task.dueDate || localDateKey(task.dueDate, env.DEFAULT_TIMEZONE) === format(zoned, "yyyy-MM-dd"))
     .map((task) => ({
       id: task.id,
       kind: "task",
@@ -64,6 +65,8 @@ export async function getDashboardToday(date = new Date()): Promise<DashboardTod
   const allItems = [...eventItems, ...taskItems];
   const current = findCurrent(eventItems, date);
   const next = findNext(eventItems, date);
+  const daySections = groupDashboardDays(allItems, date, env.DEFAULT_TIMEZONE);
+  const todaySection = daySections[0];
 
   return {
     date: format(zoned, "yyyy-MM-dd"),
@@ -77,9 +80,10 @@ export async function getDashboardToday(date = new Date()): Promise<DashboardTod
     current,
     next: next ? { ...next, countdownMinutes: minutesUntil(next.startDateTime!, date) } : null,
     sections: {
-      allDay: eventItems.filter((item) => item.isAllDay),
-      later: eventItems.filter((item) => !item.isAllDay),
-      tasks: taskItems
+      allDay: todaySection.items.filter((item) => item.kind === "event" && item.isAllDay),
+      later: todaySection.items.filter((item) => item.kind === "event" && !item.isAllDay),
+      tasks: todaySection.items.filter((item) => item.kind === "task"),
+      days: daySections
     },
     familyMembers: members.map((member) => ({
       id: member.id,
