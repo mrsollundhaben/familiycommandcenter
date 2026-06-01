@@ -197,7 +197,7 @@ export function LiveDashboard({ syncDaysAhead }: { syncDaysAhead: number }) {
   useEffect(() => {
     const refreshAfterFamilyMemberUpdate = () => void refresh();
     const refreshAfterStorageUpdate = (event: StorageEvent) => {
-      if (event.key === "family-members-updated") void refresh();
+      if (event.key === "family-members-updated" || event.key === "tasks-updated") void refresh();
     };
     const channel = "BroadcastChannel" in window ? new BroadcastChannel("family-command-center") : null;
 

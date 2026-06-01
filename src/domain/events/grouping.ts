@@ -43,7 +43,7 @@ function dashboardLabel(dayOffset: number) {
 }
 
 function isRelevantForFutureDay(item: DashboardItem) {
-  if (item.kind === "task") return false;
+  if (item.kind === "task") return !item.isDone;
   return item.rigidity === "fixed" || item.importance === "important" || item.importance === "critical";
 }
 
