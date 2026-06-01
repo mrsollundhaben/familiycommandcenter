@@ -133,3 +133,26 @@ Erwartung:
 - Status idealerweise `success`, oder `partial` nur bei echten nicht-parsbaren Einzelereignissen.
 - `eventsFetched > 0`, wenn iCloud-Termine im Zeitraum vorhanden sind.
 - Das Dashboard zeigt importierte Termine unter `/dashboard/today`.
+
+## Turbopack-Panic beim lokalen Adminbereich
+
+Der lokale Entwicklungsstart verwendet bewusst den stabileren Webpack-Compiler:
+
+```bash
+npm run dev
+```
+
+Das Script ruft `next dev --webpack` auf. Hintergrund: In manchen lokalen Next.js/Turbopack-Versionen kann beim Öffnen von App-Router-Endpunkten wie `/admin` ein Turbopack-Panic mit `Next.js package not found` auftreten. Für dieses Projekt ist Webpack im Entwicklungsmodus die stabilere Standardwahl.
+
+Falls Turbopack bewusst getestet werden soll:
+
+```bash
+npm run dev:turbo
+```
+
+Wenn nach einem Turbopack-Panic weiterhin Cache-Probleme auftreten, den lokalen Next-Cache löschen und danach wieder mit Webpack starten:
+
+```bash
+rm -rf .next
+npm run dev
+```
