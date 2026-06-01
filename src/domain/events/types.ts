@@ -25,6 +25,16 @@ export type DashboardItem = {
   isDone: boolean;
 };
 
+export type DashboardDaySection = {
+  date: string;
+  label: string;
+  dayOffset: number;
+  items: DashboardItem[];
+  totalItemCount: number;
+  hiddenItemCount: number;
+  isLimited: boolean;
+};
+
 export type DashboardToday = {
   date: string;
   timezone: string;
@@ -32,6 +42,11 @@ export type DashboardToday = {
   sync: { lastSyncAt: string | null; status: string | null; isStale: boolean };
   current: DashboardItem | null;
   next: (DashboardItem & { countdownMinutes: number }) | null;
-  sections: { allDay: DashboardItem[]; later: DashboardItem[]; tasks: DashboardItem[] };
+  sections: {
+    allDay: DashboardItem[];
+    later: DashboardItem[];
+    tasks: DashboardItem[];
+    days: DashboardDaySection[];
+  };
   familyMembers: DashboardPerson[];
 };
