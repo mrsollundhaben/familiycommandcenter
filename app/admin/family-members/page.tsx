@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/server/db/prisma";
 import { isAdminAuthenticated } from "@/server/auth/adminSession";
 import { AdminBackLink } from "@/components/admin/AdminBackLink";
+import { FamilyMemberEditor } from "@/components/admin/FamilyMemberEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -14,17 +15,19 @@ export default async function FamilyMembersPage() {
         <AdminBackLink />
       </div>
       <h1 className="mb-6 text-4xl font-black">Familienmitglieder</h1>
-      <div className="grid gap-4">
-        {members.map((member) => (
-          <article key={member.id} className="rounded-3xl bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-4 text-2xl font-black">
-              <span className="rounded-full px-4 py-2 text-white" style={{ backgroundColor: member.color }}>{member.icon} {member.shortName}</span>
-              <span>{member.displayName}</span>
-              <span className="text-base text-slate-500">{member.role}</span>
-            </div>
-          </article>
-        ))}
-      </div>
+      <p className="mb-6 rounded-2xl bg-sky-50 p-4 text-sky-950">Bearbeite Namen, Farben, Icons und Sichtbarkeit. Bestehende Termin- und Aufgaben-Zuordnungen bleiben erhalten, weil die IDs unverändert bleiben.</p>
+      <FamilyMemberEditor
+        members={members.map((member) => ({
+          id: member.id,
+          displayName: member.displayName,
+          shortName: member.shortName,
+          role: member.role,
+          color: member.color,
+          icon: member.icon,
+          sortOrder: member.sortOrder,
+          isActive: member.isActive
+        }))}
+      />
     </main>
   );
 }
