@@ -194,6 +194,23 @@ export function LiveDashboard({ syncDaysAhead }: { syncDaysAhead: number }) {
     };
   }, [refresh]);
 
+  useEffect(() => {
+    const refreshAfterFamilyMemberUpdate = () => void refresh();
+    const refreshAfterStorageUpdate = (event: StorageEvent) => {
+      if (event.key === "family-members-updated") void refresh();
+    };
+    const channel = "BroadcastChannel" in window ? new BroadcastChannel("family-command-center") : null;
+
+    channel?.addEventListener("message", refreshAfterFamilyMemberUpdate);
+    window.addEventListener("storage", refreshAfterStorageUpdate);
+
+    return () => {
+      channel?.removeEventListener("message", refreshAfterFamilyMemberUpdate);
+      channel?.close();
+      window.removeEventListener("storage", refreshAfterStorageUpdate);
+    };
+  }, [refresh]);
+
   const todayEvents = useMemo(() => data?.sections.days[0]?.items.filter((item) => item.kind === "event") ?? [], [data]);
   const current = useMemo(() => findCurrent(todayEvents, now), [todayEvents, now]);
   const next = useMemo(() => nextWithCountdown(data?.next ?? findNext(todayEvents, now), now), [data?.next, todayEvents, now]);
